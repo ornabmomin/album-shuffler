@@ -85,8 +85,9 @@ const callService = (media, queue) => {
 
 // Send each call service node sequentially
 const queueMedia = (array) => {
+  shuffle(array);
   for (let i = 0; i < array.length; i++) {
-    node.send(callService(shuffle(array)[i], "add"));
+    node.send(callService(array[i], "add"));
   }
 };
 
