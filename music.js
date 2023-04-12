@@ -1,77 +1,42 @@
-// Define media classes
-const Owntone_Album = class {
-  constructor(name, content_id) {
-    (this.name = name), (this.content_id = content_id);
+// place spotipy output in array
+const spotify_music = [],
+  owntone_music = [];
+
+// define Music class
+const Music = class {
+  constructor(type, artist, title, content_id, playlist) {
+    (this.type = type),
+      (this.artist = artist),
+      (this.title = title),
+      (this.content_id = content_id),
+      (this.playlist = playlist);
+  }
+  // return corresponding content strings based on type of music
+  get contentType_string() {
+    if (this.type === "owntone album") return "album";
+    if (this.type === "album") return "spotify://album";
+    if (this.type === "track") return "spotify://track";
   }
   get contentID_string() {
-    return `owntone:Albums / ${this.name}:library:album:${this.content_id}:`;
-  }
-  get contentType_string() {
-    return "album";
+    if (this.type === "owntone album")
+      return `owntone:Albums / ${this.title}:library:album:${this.content_id}:`;
+    if (this.type === "album") return `spotify:album:${this.content_id}`;
+    if (this.type === "track") return `spotify:track:${this.content_id}`;
   }
 };
 
-const Spotify_Album = class {
-  constructor(name, content_id) {
-    (this.name = name), (this.content_id = content_id);
+// create Music objects from array
+const createMusicObject = () => {
+  let arr = [];
+  for (let music of [...spotify_music, ...owntone_music]) {
+    arr.push(new Music(...music));
   }
-  get contentID_string() {
-    return `spotify:album:${this.content_id}`;
-  }
-  get contentType_string() {
-    return "spotify://album";
-  }
+  return arr;
 };
 
-const Spotify_Playlist = class {
-  constructor(name, content_id) {
-    (this.name = name), (this.content_id = content_id);
-  }
-  get contentID_string() {
-    return `spotify:playlist:${this.content_id}`;
-  }
-  get contentType_string() {
-    return "spotify://playlist";
-  }
-};
+const music_list = createMusicObject();
 
-// Set music array
-const music = [
-  new Owntone_Album("Neil Young - Harvest", "4535440331117785443"),
-  new Owntone_Album(
-    "Neil Young - Everybody Knows This Is Nowhere",
-    "3852155342449804352"
-  ),
-  new Spotify_Album("The New Four Seasons", "6J7CIQ4ReSZa611kZjCRkb"),
-  new Spotify_Album("Peter and the Wolf", "3QtuozLIqApRQP6K2OeMLz"),
-  new Spotify_Album("Mozart & Contemporaries", "70RFSsaRzmyH4IlZv76VKA"),
-  new Spotify_Album("Vol 1: Feminine", "1ld3DxwlntRQIplsQci5x2"),
-  new Spotify_Album("Toumani Diabaté - Kôrôlén", "4jew4Tqjgd9RW17afU15Vi"),
-  new Spotify_Album("Recap - Count to Five", "1wT74vHNvzxItAPQCPDNxV"),
-  new Spotify_Album("Spektral Quartet", "1mlGXW9NBkaGUoR6geA3Sk"),
-  new Spotify_Album("Lithuanian Symphony Orchestra", "4Qam3SXejH3rYSHKuG1Fvm"),
-  new Spotify_Album("Milosz Magin - Zal", "1G1FkYUZw9bWSuyXoonfry"),
-  new Spotify_Album(
-    "Penguin Cafe Orchestra - Broadcasting From Home",
-    "6lD2Vx9UzGNdq2Hs8RAMp2"
-  ),
-  new Spotify_Album(
-    "Penguin Cafe Orchestra - Sounds from the Penguin Cafe",
-    "2mrujo5T64bQN2SvPWranQ"
-  ),
-  new Spotify_Album(
-    "Penguin Cafe Orchestra - A Brief History",
-    "0iLpxPAsMmggTaZomqJJMy"
-  ),
-  new Spotify_Album("Wim Mertens - Jardin Clos", "6SbxfAE8tAKLU4O8b971ny"),
-  new Spotify_Album(
-    "Brian Eno - Ambient 1: Music for Airports",
-    "063f8Ej8rLVTz9KkjQKEMa"
-  ),
-  new Spotify_Album("The Books - The Lemon of Pink", "6zwjQ6buUEcF3E9IGTJXtP"),
-];
-
-// Shuffle the array in place
+// fhuffle array in place
 const shuffle = (array) => {
   let m = array.length,
     t,
@@ -88,25 +53,111 @@ const shuffle = (array) => {
   return array;
 };
 
-// Format call service message
-const callService = (media, queue) => {
+// format message for generic media_player call service message
+const callService = (service, entity = "media_player.owntone_server") => {
   return {
     payload: {
+      domain: "media_player",
+      service: service,
       data: {
-        media_content_id: media.contentID_string,
-        media_content_type: media.contentType_string,
-        enqueue: queue,
+        entity_id: entity,
       },
     },
   };
 };
 
-// Send each call service message sequentially
+// append data keys for playing media or TTS
+const playMedia = (id, content, queue) => {
+  msg = callService("play_media");
+  msg.payload.data = {
+    ...msg.payload.data,
+    media_content_id: id,
+    media_content_type: content,
+    enqueue: queue,
+  };
+  return msg;
+};
+
+// provide info about the song that is currently playing
+const nowPlaying = () => {
+  const title = owntone_server.media_title,
+    artist = owntone_server.media_artist,
+    album = owntone_server.media_album_name,
+    playing_array = [
+      `Now playing ${title} by ${artist} on the album ${album}.`,
+      `You're listening to ${title} by ${artist} from ${album}.`,
+      `This is ${artist} with ${title} from the album ${album}`,
+    ];
+  return playMedia(
+    `media-source://tts/google_cloud?message=${
+      playing_array[Math.floor(Math.random() * playing_array.length)]
+    }`,
+    "provider",
+    "play"
+  );
+};
+
+// increment or decrement volume by 1% every X seconds
+const setVolume = (
+  target_volume,
+  entity = "media_player.owntone_server",
+  frequency = 1000
+) => {
+  let current_volume = volume;
+  if (target_volume > current_volume) {
+    increment = 0.01;
+  } else if (target_volume < current_volume) {
+    increment = -0.01;
+  } else {
+    return;
+  }
+  let loop = setInterval(function () {
+    current_volume = Math.round((current_volume + increment) * 100) / 100;
+    msg = callService("volume_set", entity);
+    msg.payload.data.volume_level = current_volume;
+    node.send(msg);
+    if (current_volume === target_volume) {
+      clearInterval(loop);
+    }
+  }, frequency);
+};
+
+// shuffle an array of music and add it to the end of the queue
 const queueMedia = (array) => {
   shuffle(array);
   for (let i = 0; i < array.length; i++) {
-    node.send(callService(array[i], "add"));
+    node.send(playMedia(array[i].content_id, array[i].content_type, "add"));
   }
 };
 
-return queueMedia(music);
+// search for an album in an array and returns the content_id and content_type
+const searchMedia = (search = search_str) => {
+  id = music.find((x) => x.name === search).content_id;
+  type = music.find((x) => x.name === search).content_type;
+  return playMedia(id, type, "play");
+};
+
+// control owntone based on button presses
+switch (msg.topic) {
+  case "input_button.clear_playlist":
+    return callService("clear_playlist");
+  case "input_button.queue_playlist":
+    switch (selected_playlist) {
+      case "Morning":
+        arr = music.filter((item) => item.playlist === "morning");
+        return queueMedia(arr);
+      case "Dinner":
+        arr = music.filter((item) => item.playlist === "dinner");
+        return queueMedia(arr);
+      case "Dance":
+        arr = music.filter((item) => item.playlist === "dance");
+        return queueMedia(arr);
+      default:
+        break;
+    }
+  case "input_number.airplay_volume":
+    target_volume = Number(msg.payload) / 100;
+    return setVolume(target_volume, "media_player.owntone");
+  default:
+    break;
+}
