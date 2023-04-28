@@ -9,9 +9,10 @@ client_credentials_manager = SpotifyClientCredentials(client_id=client_id, clien
 sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 # Define playlist_uris and fetch_types as arrays
-playlist_uris = ['2P9Ni3d3X6g7esyjt4bcxe','0cc8YMQWsSzODyTpdVB6mI']
-fetch_types = ['albums', 'tracks']  # specify fetch type for each playlist URI
+playlist_uris = ['2P9Ni3d3X6g7esyjt4bcxe','2AvYq77xcAvAbQZBzqEWxX','3PK8Co8awIrAwHxMq3cFfw']
+fetch_types = ['albums', 'tracks', 'albums']  # specify fetch type for each playlist URI
 
+# Function to fetch playlist items
 def get_playlist_items(playlist_uri, fetch_type='albums'):
     item_list = []
     item_set = set()
@@ -50,6 +51,21 @@ for playlist_uri, fetch_type in zip(playlist_uris, fetch_types):
     items = get_playlist_items(playlist_uri, fetch_type=fetch_type)
     all_items.extend(items)
 
-# Print item details with comma after each array
-for item in all_items:
-    print(item, end=(', '+'\n'))
+# Convert all_items to JSON
+json_data = json.dumps(all_items, indent=4)
+
+# Read musiclist.js file
+with open('musiclist.js', 'r') as f:
+    file_content = f.read()
+
+# Replace contents of spotifyAlbums const with JSON data
+const_start = file_content.find('const spotifyAlbums = ') + len('const spotifyAlbums = ')
+const_end = file_content.find('];', const_start)
+if const_start != -1 and const_end != -1:
+    file_content = file_content[:const_start] + json_data + file_content[const_end + 2:]
+else:
+    raise ValueError("spotifyAlbums const not found in musiclist.js")
+
+# Write updated contents to musiclist.js file
+with open('musiclist.js', 'w') as f:
+    f.write(file_content)
